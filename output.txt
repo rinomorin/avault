@@ -1,0 +1,7 @@
+psql:/tmp/cvault.sql:828: NOTICE:  Added group users with owner system
+psql:/tmp/cvault.sql:829: NOTICE:  Added group system with owner system_owner
+psql:/tmp/cvault.sql:830: NOTICE:  Added group admins with owner admin_owner
+psql:/tmp/cvault.sql:831: NOTICE:  Added user admin
+psql:/tmp/cvault.sql:832: NOTICE:  Added member admin to group admins
+psql:/tmp/cvault.sql:833: NOTICE:  Added user cvsystem
+psql:/tmp/cvault.sql:834: NOTICE:  Added member cvsystem to group system

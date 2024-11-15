@@ -1,0 +1,311 @@
+import os
+import random
+import string
+from datetime import datetime
+from flask import Flask, request
+from flask_graphql import GraphQLView
+from graphene import ObjectType, String, Int, Field, List, Mutation, Schema
+from sqlalchemy import create_engine, Column, String as SQLAlchemyString, Integer, DateTime, UniqueConstraint
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import inspect
+from sqlalchemy.orm import sessionmaker
+from dotenv import load_dotenv
+import jwt
+import secrets
+from models import Base
+
+# Load environment variables
+load_dotenv()
+
+# Setup Flask app
+app = Flask(__name__)
+
+# Database setup
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///secrets.db")  # Default to sqlite for testing
+SECRETDB_URL = os.getenv("SECRETDB_URL")  # Ensure this is set in .env
+engine = create_engine(DATABASE_URL)
+Session = sessionmaker(bind=engine)
+Base = declarative_base()
+
+# Ensure SECRETDB_URL is provided
+if not SECRETDB_URL:
+    raise ValueError("SECRETDB_URL must be set in the environment variables")
+
+secret_engine = create_engine(SECRETDB_URL)
+SecretSession = sessionmaker(bind=secret_engine)
+
+# Define the Secret model
+class Secret(Base):
+    __tablename__ = 'secrets'
+    
+    id = Column(Integer, primary_key=True)
+    username = Column(SQLAlchemyString, nullable=False)
+    password = Column(SQLAlchemyString, nullable=False)
+    hostname = Column(SQLAlchemyString, nullable=False)
+    ssh_key = Column(SQLAlchemyString, nullable=False)
+    key_password = Column(SQLAlchemyString, nullable=False)
+    last_checked_out = Column(DateTime)
+    last_checked_in = Column(DateTime)
+    last_password_check = Column(DateTime)
+
+    # Add unique constraint on username and hostname
+    __table_args__ = (
+        UniqueConstraint('username', 'hostname', name='uix_username_hostname'),
+    )
+
+# Create the database tables
+Base.metadata.create_all(engine)
+
+# Update this to your actual database URI
+
+def initialize_database():
+    engine = create_engine(DATABASE_URL)
+    Base.metadata.create_all(engine)  # Creates all tables in the database
+    secret_engine = create_engine(SECRETDB_URL)
+    # SecretSession = sessionmaker(bind=secret_engine)
+
+    return sessionmaker(bind=engine)  # Return a session maker for database operations
+
+
+
+# GraphQL types
+class SecretType(ObjectType):
+    id = Int()
+    username = String()
+    hostname = String()
+    ssh_key = String()
+    key_password = String()
+    password = String()
+    last_checked_out = String()
+    last_checked_in = String()
+    last_password_check = String()
+
+# Password rule checks from .env
+MINLEN = int(os.getenv("MINLEN", 16))
+MAXLEN = int(os.getenv("MAXLEN", 63))
+UPPER = int(os.getenv("UPPER", 1))
+LOWER = int(os.getenv("LOWER", 1))
+NUMBER = int(os.getenv("NUMBER", 1))
+SPECIAL = int(os.getenv("SPECIAL", 1))
+SPECIAL_CHARS = os.getenv("SPECIAL_CHAR", "~@#%^-_=+")
+JWT_SECRET = os.getenv("JWT_SECRET") 
+
+# Password generation function
+def generate_password(length=16):
+    if length < MINLEN or length > MAXLEN:
+        raise ValueError(f"Password length must be between {MINLEN} and {MAXLEN}")
+
+    password_chars = []
+    if UPPER > 0:
+        password_chars.append(random.choice(string.ascii_uppercase))
+    if LOWER > 0:
+        password_chars.append(random.choice(string.ascii_lowercase))
+    if NUMBER > 0:
+        password_chars.append(random.choice(string.digits))
+    if SPECIAL > 0:
+        password_chars.append(random.choice(SPECIAL_CHARS))
+
+    # Fill the remaining length with a mix of all allowed characters
+    all_chars = string.ascii_letters + string.digits + SPECIAL_CHARS
+    while len(password_chars) < length:
+        password_chars.append(random.choice(all_chars))
+
+    random.shuffle(password_chars)  # Shuffle to ensure randomness
+    return ''.join(password_chars)
+
+# Password validation function
+def validate_password(password):
+    if len(password) < MINLEN or len(password) > MAXLEN:
+        raise ValueError(f"Password length must be between {MINLEN} and {MAXLEN}")
+
+    upper_count = sum(1 for c in password if c.isupper())
+    lower_count = sum(1 for c in password if c.islower())
+    number_count = sum(1 for c in password if c.isdigit())
+    special_count = sum(1 for c in password if c in SPECIAL_CHARS)
+
+    if upper_count < UPPER:
+        raise ValueError(f"Password must contain at least {UPPER} uppercase letters.")
+    if lower_count < LOWER:
+        raise ValueError(f"Password must contain at least {LOWER} lowercase letters.")
+    if number_count < NUMBER:
+        raise ValueError(f"Password must contain at least {NUMBER} digits.")
+    if special_count < SPECIAL:
+        raise ValueError(f"Password must contain at least {SPECIAL} special characters. (allowed chars {SPECIAL_CHARS})")
+
+# Generate a secure API token
+def generate_api_token(length=32):
+    return secrets.token_hex(length // 2)  # Generates a secure token
+
+# Store or update the token in the secrets database
+def store_api_token(token):
+    session = SecretSession()
+    try:
+        existing_token = session.query(Secret).first()
+        if existing_token:
+            existing_token.token = token
+            print(f"Updated API token: {token}")
+        else:
+            # Store the first token in the database
+            new_secret = Secret(token=token)
+            session.add(new_secret)
+            print(f"Generated and stored API token: {token}")
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        print(f"Error storing API token: {e}")
+    finally:
+        session.close()
+
+class Query(ObjectType):
+    secrets = List(SecretType)
+
+    def resolve_secrets(self, info):
+        session = Session()
+        try:
+            return session.query(Secret).all()
+        except Exception as e:
+            print(f"Error retrieving secrets: {e}")
+            return []
+
+class GeneratePassword(Mutation):
+    class Arguments:
+        length = Int(required=False)
+
+    password = String()
+
+    def mutate(self, info, length=16):
+        try:
+            password = generate_password(length)
+            return GeneratePassword(password=password)
+        except ValueError as e:
+            return GeneratePassword(password=str(e))
+
+class AddSecret(Mutation):
+    class Arguments:
+        username = String(required=True)
+        hostname = String(required=True)
+        password = String(required=True)
+        ssh_key = String(required=True)
+        key_password = String(required=True)
+
+    ok = String()
+    secret = Field(SecretType)    
+
+    def mutate(self, info, username, hostname, ssh_key, password, key_password):
+        session = Session()
+        try:
+            # Validate the password before saving
+            validate_password(password)
+
+            # Check if a secret with the same username and hostname already exists
+            existing_secret = session.query(Secret).filter_by(username=username, hostname=hostname).first()
+            if existing_secret:
+                return AddSecret(ok="A secret with this username and hostname already exists", secret=None)
+
+            new_secret = Secret(
+                username=username,
+                hostname=hostname,
+                ssh_key=ssh_key,
+                password=password,
+                key_password=key_password,
+                last_checked_out=None,
+                last_checked_in=None,
+                last_password_check=None
+            )
+            session.add(new_secret)
+            session.commit()
+            return AddSecret(ok="Secret added", secret=new_secret)
+        except ValueError as e:
+            return AddSecret(ok=str(e), secret=None)  # Return the validation error message
+        except Exception as e:
+            session.rollback()  # Rollback the session on error
+            print(f"Error adding secret: {e}")
+            return AddSecret(ok="An error occurred while adding the secret", secret=None)
+
+class UpdateSecret(Mutation):
+    class Arguments:
+        id = Int(required=True)
+        password = String(required=True)
+
+    ok = String()
+    secret = Field(SecretType)
+
+    def mutate(self, info, id, password):
+        session = Session()
+        try:
+            # Validate the password before updating
+            validate_password(password)
+
+            secret = session.query(Secret).filter_by(id=id).first()
+            if secret:
+                secret.password = password
+                secret.last_password_check = datetime.now()
+                session.commit()
+                return UpdateSecret(ok="Secret updated", secret=secret)
+            return UpdateSecret(ok="Secret not found", secret=None)
+        except ValueError as e:
+            return UpdateSecret(ok=str(e), secret=None)  # Return the validation error message
+        except Exception as e:
+            session.rollback()  # Rollback the session on error
+            print(f"Error updating secret: {e}")
+            return UpdateSecret(ok="An error occurred while updating the secret", secret=None)
+
+class UpdateKeySecret(Mutation):
+    class Arguments:
+        id = Int(required=True)
+        key_password = String(required=True)
+        ssh_key = String(required=True)
+
+    ok = String()
+    secret = Field(SecretType)
+
+    def mutate(self, info, id, key_password, ssh_key):
+        session = Session()
+        try:
+            secret = session.query(Secret).filter_by(id=id).first()
+            if secret:
+                secret.key_password = key_password
+                secret.ssh_key = ssh_key
+                secret.last_password_check = datetime.now()
+                session.commit()
+                return UpdateKeySecret(ok="Key password updated", secret=secret)
+            return UpdateKeySecret(ok="Secret not found", secret=None)
+        except Exception as e:
+            session.rollback()  # Rollback the session on error
+            print(f"Error updating key password: {e}")
+            return UpdateKeySecret(ok="An error occurred while updating the key password", secret=None)
+
+class Mutation(ObjectType):
+    add_secret = AddSecret.Field()
+    generate_password = GeneratePassword.Field()
+    update_secret = UpdateSecret.Field()
+    update_key_secret = UpdateKeySecret.Field()
+
+schema = Schema(query=Query, mutation=Mutation)
+
+# Load the API token and port from the .env file
+API_TOKEN = os.getenv("API_TOKEN")
+PORT = int(os.getenv("PORT", 5000))  # Default to port 5000
+HOST = os.getenv("HOST", "127.0.0.1")  # Default to localhost
+
+# JWT Token validation
+@app.before_request
+def validate_jwt_token():
+    token = request.headers.get('Authorization')
+    if token:
+        try:
+            jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        except jwt.InvalidTokenError:
+            return "Invalid token", 403  # Forbidden
+    else:
+        return "Token is missing", 401  # Unauthorized
+
+# Add GraphQL endpoint
+app.add_url_rule('/graphql', view_func=GraphQLView.as_view('graphql', schema=schema, graphiql=True))
+
+if __name__ == '__main__':
+    initialize_database()  # Ensure the database is initialized
+    new_token = generate_api_token()  
+    store_api_token(new_token)  # Store the token in the database
+    print(f"API Token: {new_token}")  # Print the token
+    app.run(host=HOST, port=PORT, ssl_context=('cert.pem', 'key.pem'), debug=False)

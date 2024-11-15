@@ -1,0 +1,27 @@
+DROP DATABASE IF EXISTS cvaultdb;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'cvadmin') THEN
+        CREATE ROLE cvadmin LOGIN PASSWORD 'cvadmin_password';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'cvservice') THEN
+        CREATE ROLE cvservice LOGIN PASSWORD 'cvservice_password';
+    END IF;
+
+END $$;
+CREATE DATABASE cvaultdb;
+\c cvaultdb;
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Create config table
+CREATE TABLE config (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    service_policy_id SERIAL,  -- Auto-incrementing column without a default value
+    vault_id SERIAL,            -- Auto-incrementing column without a default value
+    change_trigger_update_history TIMESTAMP DEFAULT NOW()
+);
