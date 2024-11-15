@@ -1,0 +1,195 @@
+
+VAULT_API:
+    __pycache__
+    server.py
+        # This use postgresql it does not install or config. 
+        # this script is intended to run with ansible yml
+        # dev all local db, production db will be remove via container or deciated db session.
+        class:            
+            f - load config 
+            f - initial db
+            f - connect to db
+            
+            
+        main
+            load
+    etc
+        env
+        config.xml
+        cert.pem
+        requirements.txt
+    lib    
+        about.py
+        front-end:npm modules)
+            login
+            graphiql
+            policly
+        modules
+            login.py
+            mutation.py
+            query.py
+            vault.py
+        sql
+            Tables:
+                CONFIG:
+                    tables:
+                    config:  key TEXT PRIMARY KEY, value TEXT NOT NULL, service_policy_id SERIAL, vault_id SERIAL, change_trigger_update_history TIMESTAMP DEFAULT NOW()
+                    functions:
+                    INSERT INTO config (key, value) VALUES ('global_encryption_key', 'dmz1nEn6Xw9vHDUOJmXp1bpn5V7eoPGIfCdQ_S4PfL4=');
+                POLICIES:
+                    Tables:
+                    policy: service_policy_id SERIAL PRIMARY KEY UNIQUE, policy_name VARCHAR NOT NULL UNIQUE, status BOOLEAN DEFAULT FALSE, 
+                            reval_cycle VARCHAR CHECK (reval_cycle IN ('daily', 'weekly', 'monthly', 'bi-monthly', 'quarterly', 'bi-yearly', 'yearly')), max_len INT DEFAULT 63,
+                            min_len INT DEFAULT 15, upper_char INT DEFAULT 1,lower_char INT DEFAULT 1, numeric_char INT DEFAULT 1, special_char INT DEFAULT 1, 
+                            special_char_string VARCHAR DEFAULT 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.~#^_=+',     password_history_count INT DEFAULT 12,
+                            password_override BOOLEAN DEFAULT FALSE,token_expire INTERVAL DEFAULT '20 minutes', change_trigger_update_history TIMESTAMP DEFAULT NOW()
+                    functions:
+                    set_auto_check_time(): funciton to set checkin time
+                    insert_policy(p_policy_name VARCHAR,p_status BOOLEAN DEFAULT FALSE,p_reval_cycle VARCHAR DEFAULT 'monthly',p_max_len INT DEFAULT 15,p_min_len INT DEFAULT 7,
+                                  p_upper_char INT DEFAULT 1,p_lower_char INT DEFAULT 1,p_numeric_char INT DEFAULT 1,p_special_char INT DEFAULT 1,
+                                  p_special_char_string VARCHAR DEFAULT 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.~#^_=+',
+                                  p_password_history_count INT DEFAULT 12,p_password_override BOOLEAN DEFAULT FALSE,p_token_expire INTERVAL DEFAULT '20 minutes', p_change_trigger_update_history TIMESTAMP DEFAULT NOW())
+                                  # add custome policy
+                    set_policy_status(p_id INT, p_status BOOLEAN)
+                    update_policy(p_id INT,p_policy_name VARCHAR DEFAULT NULL,p_reval_cycle VARCHAR DEFAULT NULL,p_max_len INT DEFAULT NULL,
+                                  p_min_len INT DEFAULT NULL,p_upper_char INT DEFAULT NULL,p_lower_char INT DEFAULT NULL,p_numeric_char INT DEFAULT NULL,
+                                  p_special_char INT DEFAULT NULL,p_special_char_string VARCHAR DEFAULT NULL,p_password_history_count INT DEFAULT NULL,
+                                  p_password_override BOOLEAN DEFAULT NULL,p_token_expire INTERVAL DEFAULT NULL,p_status BOOLEAN DEFAULT NULL)
+                                  #update policy 
+                    commands:
+                    SELECT set_policy_status(1, True);                
+                AUTH:
+                    ACL:
+                    Tables:
+                        acl: acl_id SERIAL PRIMARY KEY UNIQUE,acl_group VARCHAR, acl_permission VARCHAR,change_trigger_update_history TIMESTAMP DEFAULT NOW(), 
+                             CONSTRAINT unique_acl_group_perm UNIQUE (acl_group, acl_permission) 
+                    Functions:
+                        none
+                    USERS:
+                        Tables:
+                        users: uuid UUID PRIMARY KEY DEFAULT uuid_generate_v4(), username VARCHAR UNIQUE, first_name VARCHAR, last_name VARCHAR, password TEXT NOT NULL,
+                               email VARCHAR, phone VARCHAR, updated TIMESTAMP DEFAULT NOW(), expired TIMESTAMP, reval_by VARCHAR, reval_date TIMESTAMP, 
+                               status VARCHAR CHECK (status IN ('new', 'active', 'disable', 'lock', 'expired')),
+                               change_trigger_update_history TIMESTAMP DEFAULT NOW()
+                        Functions:
+                            lock_user(p_username VARCHAR)
+                            useradd(username VARCHAR, password TEXT, first_name VARCHAR, last_name VARCHAR, email VARCHAR, phone VARCHAR)
+                            usermod(user_id UUID, field_name TEXT, value TEXT)
+                            userpwd(requestor_id UUID, target_user_id UUID, new_password TEXT)
+                            update_password(p_username VARCHAR, p_new_password VARCHAR)
+                            validate_password(user_id UUID, password TEXT)
+                            userdel(userid INT)
+                            expire_user_password(p_username VARCHAR)
+                            disable_user(p_username VARCHAR)
+                            userreval(username VARCHAR, reviewdate TIMESTAMP, reviewedby VARCHAR)
+                    GROUPS:
+                        Tables:
+                        groups: name VARCHAR UNIQUE, members TEXT[], owner VARCHAR NOT NULL, reval_by VARCHAR, reval_date TIMESTAMP, 
+                        change_trigger_update_history TIMESTAMP DEFAULT NOW()
+                        Functions:
+                            groupadd(groupname VARCHAR, owner VARCHAR, acl_permissions TEXT[])                            
+                            updategroup(groupname VARCHAR, acl_permissions TEXT[])
+                            groupaddMember(groupname VARCHAR, newmember VARCHAR)
+                            groupdelMember(groupname VARCHAR, memberToRemove VARCHAR)
+                            groupreval(groupname VARCHAR, reviewdate TIMESTAMP, reviewedby VARCHAR)
+                    LOGIN:
+                        Tables:
+                        password_history: userid UUID REFERENCES users(uuid) ON DELETE CASCADE, password TEXT NOT NULL,last_change TIMESTAMP DEFAULT NOW(),
+                                          fail_login_count INT DEFAULT 0, PRIMARY KEY (userid, last_change)  -- Composite primary key
+                        history: timestamp TIMESTAMP DEFAULT NOW(), action VARCHAR, field_updated VARCHAR, value TEXT, updated_by VARCHAR, status VARCHAR
+                        password_audit: id SERIAL PRIMARY KEY,username VARCHAR NOT NULL, updated_at TIMESTAMP NOT NULL,status VARCHAR NOT NULL
+                        Funtions:
+                            authenticate_user(p_username VARCHAR, p_password VARCHAR)
+                            generate_password()
+                            update_password_history()
+                            checkreval()
+                        token_duration()
+                        
+            vault:
+                Tables:
+                vault_history: timestamp TIMESTAMP DEFAULT NOW(), action VARCHAR, field_updated VARCHAR, updated_by VARCHAR, status VARCHAR, value TEXT, -- Hide value if it's a password
+                               change_trigger_update_vault_history TIMESTAMP DEFAULT NOW()
+                secret_object: uniq_id SERIAL PRIMARY KEY, username VARCHAR NOT NULL, hostname VARCHAR NOT NULL, secret TEXT, ssh_key TEXT DEFAULT NULL, ssh_pwd TEXT DEFAULT NULL,
+                               check_out BOOLEAN DEFAULT FALSE, check_out_stamp TIMESTAMP, status VARCHAR, owner VARCHAR, groups TEXT[], 
+                               group_acl VARCHAR CHECK (group_acl IN ('read', 'list', 'update', 'remove', 'none')),
+                               auto_check_time INTERVAL, -- Removed DEFAULT subquery here
+                               change_trigger_update_vault_history TIMESTAMP DEFAULT NOW()
+                objects: object_id SERIAL PRIMARY KEY UNIQUE, object_name VARCHAR, object_owner VARCHAR,object_acl_groups TEXT[], object_acl VARCHAR,
+                                 change_trigger_update_history TIMESTAMP DEFAULT NOW()
+                Functions:
+                    add_secret(username VARCHAR, hostname VARCHAR, password TEXT, ssh_key TEXT, ssh_password TEXT)
+                    check_out_id(id INT)
+                    check_in_id(id INT, force BOOLEAN DEFAULT FALSE)
+                    auto_check_in(id INT)
+                    update_secret(id INT, field VARCHAR, value TEXT)
+                    delete_secret(id INT)
+            Functions:
+                
+                
+                
+                
+                
+                
+                
+                
+        system
+            auth
+                token
+                login
+                users
+                groups
+            database
+                db
+            policy
+                policies
+        vault
+            secret
+            checkin
+            checkout
+            
+GrapheQL
+ insert_policy:String: Insert a new policy       
+ set_policy_status:String: Set status for a policy
+ update_policy:String: Update an existing policy
+ View_policy:String: Update an existing policy
+
+GraphQL Schema
+├── Query:Non-authorized Section)
+│   ├── about:String): Get information about the API
+│   ├── login:String): User login to generate auth token
+│
+├── Mutation:Authorized Section)
+│   ├── lock_user:Boolean): Lock a user account
+│   ├── check_in_id:String): Check in user by ID
+│   ├── add_secret:String): Add a secret to the vault
+│   ├── view_secret:String): View a secret by ID
+│   ├── update_secret:String): Update a secret by ID
+│   ├── delete_secret:Boolean): Delete a secret by ID
+│   ├── generate_password:String): Generate a password
+│   ├── useradd:String): Add a new user
+│   ├── usermod:String): Modify a user
+│   ├── validate_password:Boolean): Validate a user's password
+│   ├── userdel:Boolean): Delete a user
+│   ├── groupadd:String): Add a new group
+│   ├── updategroup:String): Update a group name
+│   ├── groupaddMember:String): Add a user to a group
+│   ├── expire_user_password:Boolean): Expire a user's password
+│   ├── disable_user:Boolean): Disable a user
+│   ├── groupdelMember:Boolean): Remove a user from a group
+│   ├── checkreval:String): Check user revalidation status
+│   ├── userreval:String): Revalidate user password
+│   ├── groupreval:String): Revalidate group password
+│   ├── insert_policy:String): Insert a new policy
+│   ├── update_password:String): Update a user's password
+│   ├── set_policy_status:String): Set status for a policy
+│   ├── update_policy:String): Update an existing policy
+│
+├── Authorization
+│   ├── Token required for all authorized mutations
+│   └── JWT token used for access control:Bear token)
+│
+└── Error Handling
+    ├── Invalid username or password:401 Unauthorized)
+    ├── Token expired:401 Unauthorized)
+    ├── Invalid token:401 Unauthorized)
+    └── Other GraphQL Errors:e.g., mutation errors)
