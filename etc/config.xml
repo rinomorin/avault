@@ -1,0 +1,29 @@
+<?xml version='1.0' encoding='utf-8'?>
+<config>
+    <database>
+        <vaultdb>
+            <host>127.0.0.1</host>
+            <port>5432</port>
+            <dbname>vaultdb</dbname>
+            <user>vadmin</user>
+            <password>gAAAAABnOJJfvcDtQgIlkfJvrzNM6te5f-5vkzCG0fW_lbfZpgh_Pj_77Lt_YFgI_tmJPHveiu-xfq87hfM1U9GUILapCEb88A==</password>
+            <description>Vault DB system (vadmin_password)</description>
+            <key>dmz1nEn6Xw9vHDUOJmXp1bpn5V7eoPGIfCdQ_S4PfL4=</key>
+        </vaultdb>
+        <secretdb>
+            <host>127.0.1.1</host>
+            <port>5432</port>
+            <dbname>secretdb</dbname>
+            <user>vservice</user>
+            <password>gAAAAABnOJJfCuflDo6pIFSqJLTXRF1KP8ewWAiaEFvFy6SiC572juDqRI4WNjgLcuijI0I2U9cCUChrenZnAVOrRhc-EzMWC1KgTSAQ2MEcYDQHK0J_9rA=</password>
+            <description>Vault DB system (vservice_password)</description>
+            <key>dmz1nEn6Xw9vHDUOJmXp1bpn5V7eoPGIfCdQ_T4PfL4=</key>
+        </secretdb>
+    </database> 
+    <api>
+        <hostname>0.0.0.0</hostname>
+        <port>5000</port>
+        <initial_token>initial_token_secret</initial_token>
+        <token_expire_minutes>20</token_expire_minutes>
+    </api>
+</config>

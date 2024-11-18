@@ -1,0 +1,16 @@
+Flask==2.0.3
+Werkzeug==2.0.3
+SQLAlchemy==1.4.27
+python-dotenv==0.19.2
+Flask-GraphQL==2.0.0
+graphql-core==2.3.0
+graphene==2.1.8
+graphql-relay==2.0.0
+cryptography
+PyJWT
+psycopg2-binary
+python-jose
+Flask-JWT-Extended
+bcrypt
+xmltodict
+passlib
