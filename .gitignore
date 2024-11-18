@@ -1,6 +1,6 @@
 tmp/*
 vrel9/*
-logs/*
+logs/*.log
 Flow_Planing.py
 api_tree.txt
 gen_init.py
