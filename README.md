@@ -1,8 +1,9 @@
-# Avault
+# Avault 
+## (prototyping phase)
 
 **Avault** is a password management system written in Python, featuring a GraphQL API and a PostgreSQL backend. It consists of two main components:  
 1. **Avault** - The core password management system.  
-2. **Secret Password Section** - A dedicated module for secure password handling (currently under development).
+2. **Secret Password Section** - A dedicated module for secure password handlin0
 
 ---
 
