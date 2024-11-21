@@ -2,10 +2,14 @@
 from flask import Flask, request, jsonify
 from flask_graphql import GraphQLView
 from graphene import Schema
-from lib.restapi.modules.dbsetup import Setup
-from lib import home_base, config_file, debug  
+from lib.db.dbsetup import Setup
+from lib import config_file, debug  
 from lib.restapi.modules.queries import Query
 from lib.restapi.modules.mutations import Mutation
+from lib.log_mod import logit
+
+logger = logit()
+
 
 ap=Setup(config_file)
 ap.load_config()

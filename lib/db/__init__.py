@@ -1,4 +1,5 @@
 # lib/__init__.py
-from .avault import Avault
+from .avaultdb import AvaultDB
+from .dbsetup import Setup
 
-__all__ = ["Avault"]
+__all__ = ["AvaultDB","Setup"]

@@ -3,6 +3,9 @@ import psycopg2
 from lib import home_base, config_file, debug
 from lib.config import ConfigManager
 from lib.db.modules.connection import DB_CONN
+from lib.log_mod import logit
+
+logger = logit()
 
 class Setup:
     def __init__(self, config_file=None):
@@ -48,10 +51,6 @@ class Setup:
         except Exception as e:
             print(f"Error parsing the XML file: {e}")
             return []
-
-    # Load and parse the XML file
-    # xml_file = "config.xml"  # Replace with the path to your XML file
-    # db_names = .get_database_names(xml_file)
 
     def load_config(self):
         cm = self.cm
@@ -115,13 +114,3 @@ class Setup:
             db_list[dbname]=a_list[dbname]
             self.try_connection(a_list[dbname])
             dbname=None
-        
-
-    
-
-
-# vapi = API_init(config_file)
-# api_conf = vapi.get_config("api_config")
-# print(api_conf)
-# # S{'hostname': '0.0.0.0', 'port': '5000', 'initial_token': 'initial_token_secret', 'token_expire_minutes': '20'}
-# print(api_conf.get("hostname", "127.0.0.1"))

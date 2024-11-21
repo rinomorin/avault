@@ -2,9 +2,8 @@
 import os
 from lib import logit
 from lib.restapi.rest_api import Loading, app
-from lib.restapi.modules.dbsetup import Setup
+from lib.db.dbsetup import Setup
 from lib import home_base, config_file, debug
-
 
 logger = logit()
 logger.info("starting")
