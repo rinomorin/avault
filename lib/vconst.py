@@ -12,6 +12,7 @@ home_base = current_directory.parents[0]
 default_config_file = os.path.join(home_base, "etc", "config.xml")
 default_debug = False  # Default value for debug
 
+
 # Set up argument parsing to override config file path and debug value
 def parse_args():
     parser = argparse.ArgumentParser(description="Override config file path and debug setting.")
@@ -36,4 +37,5 @@ config_file = args.config if args.config else default_config_file
 debug = args.debug  # Will be True if --debug is passed, False otherwise
 
 print(f"Using config file: {config_file}")
+
 print(f"Debug mode: {debug}")

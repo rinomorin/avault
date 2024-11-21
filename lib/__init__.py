@@ -1,9 +1,5 @@
-# ./lib/_init_.py
-# Initialization for the lib package
-__all__ = ["config", "db", "sql"]
-
-from .config import *
-from .database import *
-from .sql import *
+# lib/__init__.py
+from .vconst import home_base, config_file, debug
 from .log_mod import logit
-from .vconst import *
+
+__all__ = ["home_base", "config_file", "debug", "logit"]

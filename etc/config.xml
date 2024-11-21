@@ -16,7 +16,7 @@
             <dbname>secretdb</dbname>
             <user>vservice</user>
             <password>gAAAAABnOJJfCuflDo6pIFSqJLTXRF1KP8ewWAiaEFvFy6SiC572juDqRI4WNjgLcuijI0I2U9cCUChrenZnAVOrRhc-EzMWC1KgTSAQ2MEcYDQHK0J_9rA=</password>
-            <description>Vault DB system (vservice_password)</description>
+            <description>Secret DB system (vservice_password)</description>
             <key>dmz1nEn6Xw9vHDUOJmXp1bpn5V7eoPGIfCdQ_T4PfL4=</key>
         </secretdb>
     </database> 
